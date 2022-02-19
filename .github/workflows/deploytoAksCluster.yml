@@ -1,0 +1,50 @@
+on: [push]
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@master
+    
+    - uses: azure/docker-login@v1
+      with:
+        login-server: ukiacr.azurecr.io
+        username: ${{ secrets.acr_ukiacr_username }}
+        password: ${{ secrets.acr_ukiacr_password }}
+    
+    - name: Build and push image to ACR
+      id: build-image
+      run: |
+        docker build "$GITHUB_WORKSPACE/Okuyucu" -f  "zteckjob" -t ukiacr.azurecr.io/zteckjob:${{ github.sha }} --label dockerfile-path=zteckjob
+        docker push ukiacr.azurecr.io/zteckjob:${{ github.sha }}
+    
+    - uses: azure/k8s-set-context@v1
+      with:
+         kubeconfig: ${{ secrets.aks_zteckjob_kubeConfig }}
+      id: login
+    
+    - name: Create namespace
+      run: |
+        namespacePresent=`kubectl get namespace | grep zteckjob | wc -l`
+        if [ $namespacePresent -eq 0 ]
+        then
+            echo `kubectl create namespace zteckjob`
+        fi
+
+    - uses: azure/k8s-create-secret@v1
+      with:
+        namespace: zteckjob
+        container-registry-url: ukiacr.azurecr.io
+        container-registry-username: ${{ secrets.acr_ukiacr_username }}
+        container-registry-password: ${{ secrets.acr_ukiacr_password }}
+        secret-name: zteckjobdockerauth
+       
+    - uses: azure/k8s-deploy@v1.2
+      with:
+        namespace: zteckjob
+        manifests: |
+          manifests/deployment.yml
+          manifests/service.yml
+        images: |
+          ukiacr.azurecr.io/zteckjob:${{ github.sha }}
+        imagepullsecrets: |
+          zteckjobdockerauth
