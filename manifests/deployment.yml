@@ -1,0 +1,19 @@
+apiVersion : apps/v1
+kind: Deployment
+metadata:
+  name: "zteckjob-bf03"
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: "zteckjob-bf03"
+  template:
+    metadata:
+      labels:
+        app: "zteckjob-bf03"
+    spec:
+      containers:
+        - name: "zteckjob-bf03"
+          image: "ukiacr.azurecr.io/zteckjob"
+          ports:
+          - containerPort: 4000
